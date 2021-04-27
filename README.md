@@ -134,7 +134,7 @@ spec:
           name: http-api
           protocol: TCP
         volumeMounts: // we mount the file .env in /config/ based on the volume dot env below 
-        - mountPath: /config 
+        - mountPath: /config  // we mount in /config because we cannot mount a read only volume directly on /
           name: dotenv
           readOnly: true
       volumes:  // We define the volume based on the configmap we created
