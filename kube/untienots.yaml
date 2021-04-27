@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: untienots
+  labels:
+    app: untienots
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: untienots
+  template:
+    metadata:
+      labels:
+        app: untienots
+    spec:
+      containers:
+      - args:
+        name: untienots
+        image: gmiamz/untienots:0.4
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+          name: http-api
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /config
+          name: dotenv
+          readOnly: true
+      volumes:
+      - configMap:
+          name: dotenv
+        name: dotenv
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: untienots-svc
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: untienots
+  sessionAffinity: None
+  type: ClusterIP
