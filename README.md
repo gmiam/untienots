@@ -224,8 +224,155 @@ The proxy will then be able to perform some control or modification on the traff
 
 There are also tools such as Cilium based on the new eBPF capabilities of the Linux kernel that override all the network stack of Kubernetes (not based on iptables) and being much more performant and also providing a fine-grained control over which pod is allowed to reach a specific pod.
 
-As the only way to reach a pod in a kubernetes cluster should be to go through an ingress (hence a pod), this allow to very precisely control all the traffic going in and out the cluster in addition of controlling the cluster inside the cluster.
+As the only way to reach a pod in a kubernetes cluster from the outside should be to go through an ingress (hence a pod), this allow to very precisely control all the traffic going in and out the cluster in addition of controlling the cluster inside the cluster.
 
+
+Saying this, in our example we have only two kind of pods in our API workflow and no public exposition. Therefore we will use the native kubernetes object NetworkPolicy. The goal would be to have:
+
+* For the python API pod to be reacheable from anywhere (we will need this for our tests as we don't use ingress yet) and allow this pod to make calls to any pod in the mongodb namespace with the label role=db.
+* For the database pods to be reacheable from any pod in our untienots namespace matching the label role=fastapi and port 27017 only and not able to make any external calls (external stand for external to the pod) except for other pods of the mongodb namespace as communication between operator and mongodb agents is mandatory.
+
+In order to do so we will start with adding some labels to the namespaces and in deployment/statefulset (for the depending pods) we have created so far.
+
+```
+kubectl edit ns mongodb
+```
+In metadata we add the label project=mongodb. Here the relevant subset of the deployment:
+
+```
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    project: mongodb 
+  name: mongodb
+.
+.
+.
+```
+
+```
+root@ip-172-31-1-66:/home/ubuntu# kubectl get ns mongodb --show-labels
+NAME      STATUS   AGE   LABELS
+mongodb   Active   45h   project=mongodb
+```
+
+We then do the same with the namespace untienots and add the label project=fastapi.
+
+We now edit the deployment untienots in the namespace untienots (yes, we haven't been really original with the names here).
+
+```
+kubectl -n untienots edit deploy untienots
+```
+
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    ...
+  labels:
+    app: untienots
+  name: untienots
+  namespace: untienots
+.
+.
+.
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: untienots
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: untienots
+        role: fastapi // This is the label we are adding
+    spec:
+      containers:
+.
+.
+.
+```
+
+It works in the same way to add labels on pods depending on a statefulset. So we proceed and add the label role=db for the statefulset example-mongodb in the namespace mongodb.
+
+We can now create the NetWorkPolicy objects we need to control traffic. The first one in the mongodb namespace:
+
+```
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mongodb-networkpolicy
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          project: mongodb
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          project: untienots
+      podSelector:
+        matchLabels:
+          role: fastapi
+    - namespaceSelector:
+        matchLabels:
+          project: mongodb
+    ports:
+    - port: 27017
+      protocol: TCP
+```
+
+We allow all outgoing traffic in the namespace mongodb and denynig everything else.
+
+We allow ingoing traffic from mongo namespace and from all pods with role=fastapi label in the untienots namespace on port 27017.
+
+And then the second one in the untienots namespace:
+
+```
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fastapi-networkpolicy
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          project: mongodb
+      podSelector:
+        matchLabels:
+          role: db
+  ingress: 
+  - {}
+    ports:
+    - port: 27017
+      protocol: TCP
+```
+
+Here we allow all incoming traffic (no specific ingress rule).
+And we allow outgonig traffic only to the pods havnig the role=db label in the mongodb namespace.
+
+**Note: the NetworkPolicy object may have different behavior depending on the network provider used in your kubernetes cluster (flannel, calico, weave, cilium, ...)**
 
 ## Migrate a Kubernetes Cluster
 
