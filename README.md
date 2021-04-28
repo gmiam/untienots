@@ -228,3 +228,19 @@ As the only way to reach a pod in a kubernetes cluster should be to go through a
 
 
 ## Migrate a Kubernetes Cluster
+
+The migration of stateless resources from a kubernetes cluster to another is pretty straightforward, and it's easy to imagine processes without downtime kind of like blue/green deployments.
+
+The difficulty here is that we also have our database in the cluster. It is obviously stateful as it owns the data it contains. It is therefore not possible to have a 0 downtime migration without doing any change in the code (like the application will write in the two databases for some time) if we want to assure 100% data consistency. Then the goal will be to reduce the downtime as much as we can. And maybe find a way to achieve partial downtime. Indeed, reads in the database are idempotent and won't change the datas. So here are the steps proposed:
+
+* Create the new cluster
+* Set up the cluster with all the new features needed
+* Create the new database in it
+* Migrate all the stateless content (workload)
+* If possible interrupt all the write operations in the database. This can be achieved at API Management level for example by directly sending back gracefull errors on methodes which will need to write in the database. If not possible respond to all requests with a maintenance status
+* Migrate all the datas
+* Redirect requests to the new workload at load balancer level if we use the same infrastructure or at DNS level if not (be careful here, DNS entries have a TTL in each DNS server, therefore the change may take some time to reflect)
+* Reactivate all API methods which need write access in the database
+* All requests should now be ok on the new cluster with no data losses. The downtime may be partial only and would last only the time needed to replicate data and switch traffic to the new cluster
+
+Note: if there is a high volume of data, we can prepare a first data replication before the migration process and perform only on incremental replication during the migration to reduce the downtime period.
