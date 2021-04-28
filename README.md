@@ -1,6 +1,6 @@
 # Cloud/DevOps Technical Test - Result
 
-This is a walkthrough of what has been done to meet the requirements of this exercice. We can consider this as a readme as following these instruction will give a working example. But this is also a place used to discuss what is not optimal and what can be imagine to go further.
+This is a walkthrough of what has been done to meet the requirements of this exercice. We can consider this as a readme as following these instructions will give a working example. But this is also a place used to discuss what is not optimal and what can be imagine to go further.
 
 To follow all the commands listed below, you will need to first clone this repository. Once done, you can use them as is if you're in the root directory of the repo.
 
@@ -28,7 +28,7 @@ COPY ./app /app
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80"]
 ```
 
-We start with a python base image (we will discuss this later). We install the depencies we need and that are not included in the base image.
+We start with a python base image (we will discuss this later). We install the dependancies we need and that are not included in the base image.
 
 We copy the app folder containing the fastapi code in the container. We can notice here that we don't copy the .env file in this docker image. We'll get back to that later. 
 * Note: we modified the app/\_\_init__.py file provided by modifying the env_file variable from .env to config/.env - more on this later (the change have been reflected in this repository)
@@ -78,10 +78,10 @@ kubectl apply -f mongodb/service_account.yaml -n mongodb
 // deployment for the mongo operator itself
 kubectl create -f mongodb/manager.yaml -n mongodb
 // We create the user we will use with its password and roles/permissions
-kubectl apply -f mongodb/mongodb.com_v1_mongodbcommunity_cr.yaml -n mongodb  (user, role and password)
+kubectl apply -f mongodb/mongodb.com_v1_mongodbcommunity_cr.yaml -n mongodb
 ```
 
-* Note: For this last file, the password is hardcoded in it (it is possible to delete the secret once the user is created), and we add a role readWriteAnyDatabase on the default db admin. We recommend to check the detail of this file for a better understanding. This is not optimal on a security standpoint, but rbac fine tuning has been considered out of scope of this exercise
+* Note: For this last file, the password is hardcoded in it (it is possible to delete the secret once the user is created), and we add a role readWriteAnyDatabase on the default db admin. We recommend to check the detail of this file for a better understanding. This is not optimal on a security standpoint, but rbac fine tuning has been considered out of scope for this exercise
 
 After this we should have an operator pod up and running alongside three mongodb pods managed by a statefulset.
 
@@ -192,9 +192,9 @@ We have now our API working in a development environment and we have a lot more 
 
 In order to use an API in production, we need to be able to expose it over internet. We need also to have a nice public DNS domain and alias. Assuming we will run our kubernetes cluster over a public cloud provider such as GCP or AWS, we consider the DNS objects as infrastructure. As all our infrastructure, we want it defined as code.
 
-The major tool used to do that is Terraform. Terraform is composed of a CLI and a delarative language (HCL). Using it we are able to declare all our infrastructure in declarative file, using the proprietary HCL language. Terraform maintain also a state for each project (by default in a *.tfstate file). And each time we use the cli in our project, Terraform will refresh its internal state comparing the actual infrastructure and the tfstate file. Base on that comparison, it will ouput all the changes that need to be made in order to have the infrastructure matching the declarative file. In order to do so, Terraform use the APIs of the main cloud provider (but also other connector such as VMware or kubernetes itself).
+The major tool used to do that is Terraform. Terraform is composed of a CLI and a delarative language (HCL). Using it we are able to declare all our infrastructure in declarative file, using the proprietary HCL language. Terraform maintain also a state for each project (by default in a *.tfstate file). And each time we use the cli in our project, Terraform will refresh its internal state comparing the actual infrastructure and the tfstate file. Based on that comparison, it will ouput all the changes that need to be made in order to have the infrastructure matching the declarative file. In order to do so, Terraform use the APIs of the main cloud provider (but also other connector such as VMware or kubernetes itself).
 
-Everything Terraform use to create or modify resources is publicly available through apis or cli coming from vendor themselves (AWS even have its own cli and its own infrastructure as code: CloudFormation). The value of terraform is in its maturity and in the possibility to reuse some part of the code between different provider (it can be very tricky though).
+Everything Terraform use to create or modify resources is publicly available through apis or cli coming from vendors themselves (AWS for example even have its own cli and its own infrastructure as code: CloudFormation). The value of terraform is in its maturity and in the possibility to reuse some part of the code between different provider (it can be very tricky though).
 
 * Note: there is a newcomer in this market: Pulumi. Its particularity is to rely on mainstream language to describe the infrastructure (python, go, typescript, ...). This is an interesting approach as a lot of people know these languages and it also allow to perform unit testing on Pulumi code. (Disclaimer: I never tried to use it yet)
 
@@ -207,12 +207,12 @@ It will emit a certificate valid for three months and its integration with this 
 **Q2/ How can we make sure that our Docker images running in production are secure? What security risks are we exposed to if we run any images we find in production?**
 
 The use of secure docker images in production is a major concern. Indeed we don't have the same isolation level as we have using virtual machines so in the worst case scenario a container is fully compromised and can be used to spy on other processes on the host (eventually other containers).
-The first reflex to have is to check the base image we use. I usually recommend to use Google's distroless image which are well hardenized. I didn't use it during the exercise because it would have required a bit of rework around the dependancies installation and this seemed a bit out of scope. Also we need to check precisely every layer we had on the base image to make sure we understand and eventually control eveyrhtin we add.
+The first reflex to have is to check the base image we use. I usually recommend to use Google's distroless image which are well hardenized. I didn't use it during the exercise because it would have required a bit of rework around the dependancies installation and this seemed a bit out of scope. Also we need to check precisely every layer we had on the base image to make sure we understand and eventually control everything we add.
 It is also a good practice to scan the images we build in the CI/CD chain with tools like Clair or Anchore.
 
 The risks we face running non secure docker images in production are many.
 * We can have a compromised container as describe earlier.
-* We can have a process spying on the traffic and forwarding traffic outside (even though it can be mitigated)
+* We can have a process spying on the traffic and forwarding data to arbitrary destination (even though it can be mitigated)
 * We can face performance issue because of other processes running inside the container or having unnecessary huge image which can impact the whole platform in term of performance and cost
 * We even have seen some docker images which were used to mine cryptocurrencies...
 
@@ -372,7 +372,7 @@ spec:
 Here we allow all incoming traffic (no specific ingress rule).
 And we allow outgonig traffic only to the pods havnig the role=db label in the mongodb namespace.
 
-**Note: the NetworkPolicy object may have different behavior depending on the network provider used in your kubernetes cluster (flannel, calico, weave, cilium, ...)**
+**Note: be very careful as the NetworkPolicy object may have different behavior depending on the network provider used in your kubernetes cluster (flannel, calico, weave, cilium, ...)**
 
 ## Migrate a Kubernetes Cluster
 
@@ -384,7 +384,7 @@ The difficulty here is that we also have our database in the cluster. It is obvi
 * Set up the cluster with all the new features needed
 * Create the new database in it
 * Migrate all the stateless content (workload)
-* If possible interrupt all the write operations in the database. This can be achieved at API Management level for example by directly sending back gracefull errors on methodes which will need to write in the database. If not possible respond to all requests with a maintenance status
+* If possible interrupt all the write operations in the database. This can be achieved at API Management level for example by directly sending back graceful errors on methods which will need to write in the database. If not possible respond to all requests with a maintenance status
 * Migrate all the datas
 * Redirect requests to the new workload at load balancer level if we use the same infrastructure or at DNS level if not (be careful here, DNS entries have a TTL in each DNS server, therefore the change may take some time to reflect)
 * Reactivate all API methods which need write access in the database
